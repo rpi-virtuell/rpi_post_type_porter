@@ -1,0 +1,22 @@
+.rpi-porter-data-container {
+    margin-bottom: 20px;
+}
+
+.rpi-porter-object-container {
+    margin-bottom: 10px;
+}
+
+.rpi-porter-object-title {
+    display: block;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.rpi-porter-object-content {
+    margin-left: 20px;
+}
+
+.rpi-porter-entry-row {
+    margin-bottom: 5px;
+    padding-left: 20px;
+}
