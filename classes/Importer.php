@@ -1,4 +1,5 @@
 <?php
+
 class Importer
 {
     public function __construct()
@@ -7,26 +8,86 @@ class Importer
     }
 
 
-    function rpi_porter_save_post_handler() {
-        $postData = $_POST['postData'];
-
+    function rpi_porter_save_post_handler()
+    {
         // Überprüfen der Nonce
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'my_ajax_nonce')) {
             wp_die('Sicherheitsüberprüfung fehlgeschlagen.');
         }
 
-        $post_data = array(
+        $postMapping = $_POST['postMapping'];
+
+        if (is_array($postData)) {
+            foreach ($postData as $postItem) {
+                // Hier rufen Sie eine Funktion auf, um jeden potenziellen Post zu verarbeiten
+                $this->create_individual_post($postItem);
+            }
+        } else {
+            wp_send_json_error('Fehler: Die Daten sind nicht im erwarteten Format.');
+        }
+
+        wp_send_json_success('Alle Posts wurden erfolgreich importiert.');
+        wp_die();
+    }
+
+
+    function create_individual_post($postItem)
+    {
+
+        $postData = $postItem;
+
+
+        $arr = array(
             'post_author' => 1, // oder einen dynamischen Autor
             'post_content' => $postData['content']['rendered'],
             'post_title' => $postData['title']['rendered'],
             'post_status' => 'publish',
-            'post_type' => 'news',
+            'post_type' => $postData['type'],
             'meta_input' => array(
                 'import_id' => $postData['id'], // oder eine andere eindeutige ID
             ),
+            'tax_input' => [],
         );
-        
-        $post_id  = wp_insert_post($post_data);
+
+        if (array_key_exists('acf', $postData)) {
+            foreach ($postData['acf'] as $post_meta_key => $post_meta_value) {
+                $arr['meta_input'][$post_meta_key] = $post_meta_value;
+            }
+        }
+
+        if (array_key_exists('wp_term', $postData)) {
+            $wp_terms = $postData['wp_term'];
+            foreach ($wp_terms as $wp_term) {
+                $taxonomy_slug = $wp_term['taxonomy'];
+                if (!taxonomy_exists($taxonomy_slug)) {
+                    register_taxonomy(sanitize_key($taxonomy_slug), $postData['type']);
+                }
+
+                // Senden der Anfrage
+                $response = wp_remote_get($wp_term['href']);
+
+                // Überprüfen, ob die Anfrage erfolgreich war
+                if (is_wp_error($response)) {
+                    // Fehlerbehandlung
+                    error_log('Fehler bei der Anfrage: ' . $response->get_error_message());
+                    return;
+                }
+
+                // Verarbeiten der Antwort
+                $body = wp_remote_retrieve_body($response);
+                $data = json_decode($body);
+
+                if (!term_exists($data['slug'], $taxonomy_slug)) {
+                    wp_create_term($data['slug'], $taxonomy_slug);
+                }
+                $arr['tax_input'][$taxonomy_slug] = $data['slug'];
+
+
+            }
+
+        }
+
+        $post_id = wp_insert_post($arr);
 
         // Überprüfen, ob der Post erfolgreich erstellt wurde
         if ($post_id !== 0) {
