@@ -26,37 +26,39 @@ jQuery(document).ready(function ($) {
             html += '<form id="import-form" method="post">\n' +
                 '    <input type="button" id="import-button" class="button button-primary" value="Importieren">\n' +
                 '</form>'
+            html += '<div class="rpi-porter-progress"></div>'
             $('#data-display').html(html);
         }
     }
 
-    function iterateThroughData(data) {
+    function iterateThroughData(data, recursiv = false) {
         var html = '<div class="rpi-porter-data-container">';
 
 
         var routeMapping = {"status": post_status, "type": post_type, "author": post_author,};
-        var ignoreDataFields = ['content', 'title', 'link'];
-        console.log(routeMapping);
+        var dataFields = ['status', 'type', 'author', 'acf', 'meta','_links', 'wp:attachment' ,'wp:term', 'version_history'];
         for (var key in data) {
-            if (routeMapping[key] !== undefined) {
-                html += '<label class="'+key+'">'+key+'</label></br>';
-                html += '<select name="'+key+'">';
-                for (var post_data_key in routeMapping[key]){
-                    html += '<option value="'+post_data_key+'">'+routeMapping[key][post_data_key]+'</option>'
+            if (dataFields.includes(key) ||  recursiv)
+            {
+                if (routeMapping[key] !== undefined) {
+                    html += '<label class="'+key+'"><strong>'+key+'</strong></label></br>';
+                    html += '<select class="rpi-porter-select-box" name="'+key+'">';
+                    for (var post_data_key in routeMapping[key]){
+                        html += '<option value="'+post_data_key+'">'+routeMapping[key][post_data_key]+'</option>'
+                    }
+                    html += '</select></br>';
+                    continue;
                 }
-                html += '</select>';
-                break;
+                if (routeMapping[key] === undefined   && data[key] !== null && typeof data[key] === 'object') {
+                    html += '<div class="rpi-porter-object-container"><strong class="rpi-porter-object-title">' + key + '</strong>';
+                    html += '<div class="rpi-porter-object-content">';
+                    html += iterateThroughData(data[key], true);
+                    html += '</div></div>';
+                }
+                else {
+                    html += createInputRow(key, data[key]);
+                }
             }
-            if (routeMapping[key] === undefined && !ignoreDataFields.includes(key)  && data[key] !== null && typeof data[key] === 'object') {
-                html += '<div class="rpi-porter-object-container"><strong class="rpi-porter-object-title">' + key + '</strong>';
-                html += '<div class="rpi-porter-object-content">';
-                html += iterateThroughData(data[key]);
-                html += '</div></div>';
-            }
-            else {
-                html += createInputRow(key, data[key]);
-            }
-
         }
         html += '</div>';
 
@@ -75,8 +77,17 @@ jQuery(document).ready(function ($) {
 
     jQuery(document).ready(function ($) {
         $('#import-button').click(function () {
+            rpi-porter-progress
+            $(this).find('.rpi-porter-progress').html += '<div class="progress-container">' +
+                '<div class="progress-bar" id="myProgressBar"></div>' +
+                '    </div>' +
+                '    <button id="stopButton">Stop Import</button>\n';
             var postMapping = collectDataForImport();
 
+
+            //TODO: this part needs to be in its own function to be called recursivly
+            // required params are next route and field_template
+            // optional param is created posts
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
@@ -87,6 +98,10 @@ jQuery(document).ready(function ($) {
                 },
                 success: function (response) {
                     alert('Import erfolgreich!');
+                    updateProgressBar();
+                    //TODO ADD update Progress bar logic
+                    //TODO: check if stop  button has been pressed
+                    // if not recall save post function with passed data from response
                 },
                 error: function () {
                     alert('Fehler beim Import.');
@@ -94,6 +109,17 @@ jQuery(document).ready(function ($) {
             });
         });
     });
+
+    function updateProgressBar() {
+        const progress = (importedData / totalData) * 100;
+        progressBar.style.width = `${progress}%`;
+
+        if (importedData === totalData) {
+            alert('Data import complete!');
+            importInProgress = false;
+        }
+    }
+
 
     function collectDataForImport() {
         var importedData = [];
@@ -106,6 +132,9 @@ jQuery(document).ready(function ($) {
             $(this).find('.rpi-porter-entry-row').each(function () {
                 if ($(this).find('.rpi-porter-import-check').is(':checked')) {
                     postMapping[$(this).find('.rpi-porter-old-key').val()] = $(this).find('.rpi-porter-new-key').val();
+                }
+                if ($(this).find('.rpi-porter-select-box').length){
+                    postMapping[$(this).find('.rpi-porter-select-box').name] = $(this).find('.rpi-porter-select-box').val();
                 }
             });
 

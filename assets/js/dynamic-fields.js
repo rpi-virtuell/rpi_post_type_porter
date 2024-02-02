@@ -22,3 +22,5 @@ jQuery(document).ready(function($) {
         });
     });
 });
+
+// TODO: Add progressbar and Button

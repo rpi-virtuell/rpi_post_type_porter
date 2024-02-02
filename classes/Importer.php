@@ -17,7 +17,23 @@ class Importer
 
         $postMapping = $_POST['postMapping'];
 
+        if (key_exists('route', $postMapping) )
+        {
+            $route = $postMapping['route'];
+            $response = wp_remote_get($route);
+            if (is_wp_error($response)) {
+                // Handle error
+                echo 'Error: ' . $response->get_error_message();
+            } else {
+                // Process the response
+                $body = wp_remote_retrieve_body($response);
+                $data = json_decode($body, true);
+
+            }
+        }
+
         if (is_array($postData)) {
+
             foreach ($postData as $postItem) {
                 // Hier rufen Sie eine Funktion auf, um jeden potenziellen Post zu verarbeiten
                 $this->create_individual_post($postItem);
@@ -31,11 +47,30 @@ class Importer
     }
 
 
+// Function to extract pagination links from headers
+    function get_pagination_links($response) {
+        $pagination_links = array();
+
+        $header_links = wp_remote_retrieve_header($response, 'link');
+        if ($header_links) {
+            $matches = array();
+            preg_match_all('/<([^>]+)>;\s*rel="([^"]+)"/', $header_links, $matches, PREG_SET_ORDER);
+
+            foreach ($matches as $match) {
+                $pagination_links[$match[2]] = $match[1];
+            }
+        }
+
+        return $pagination_links;
+    }
+
+
     function create_individual_post($postItem)
     {
 
         $postData = $postItem;
 
+// TODO : Save all created post,  tax and term ids in var and return them in response to delete them if the user wishes to do so
 
         $arr = array(
             'post_author' => 1, // oder einen dynamischen Autor
